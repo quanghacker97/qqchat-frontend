@@ -2,10 +2,16 @@
 
 import { useDraggable } from "@dnd-kit/core";
 import { motion } from "framer-motion";
-import { Pencil, Trash2, CalendarDays, GripVertical } from "lucide-react";
-import { Task } from "@/types/task";
+import { Pencil, Trash2, CalendarDays, GripVertical, CheckCircle2 } from "lucide-react";
+import { Task, TaskPriority } from "@/types/task";
 import { PriorityBadge } from "./PriorityBadge";
 import { Avatar } from "./Avatar";
+
+const ACCENT: Record<TaskPriority, string> = {
+  low: "bg-emerald-400",
+  medium: "bg-amber-400",
+  high: "bg-rose-400",
+};
 
 function formatDate(iso: string) {
   const d = new Date(iso);
@@ -41,6 +47,8 @@ export function TaskCard({
     e.stopPropagation();
   }
 
+  const isDone = task.status === "done";
+
   return (
     <motion.div
       ref={setNodeRef}
@@ -52,37 +60,59 @@ export function TaskCard({
       initial={{ opacity: 0, y: 12, scale: 0.97 }}
       animate={{ opacity: isDragging ? 0.4 : 1, y: 0, scale: 1 }}
       exit={{ opacity: 0, scale: 0.9, transition: { duration: 0.15 } }}
-      whileHover={{ y: -3 }}
+      whileHover={{ y: -4, scale: 1.01 }}
       transition={{ type: "spring", stiffness: 400, damping: 30 }}
-      className="group relative touch-none cursor-grab select-none rounded-xl border border-black/5 bg-white p-3.5 shadow-sm ring-1 ring-black/[0.02] hover:shadow-md active:cursor-grabbing dark:border-white/10 dark:bg-neutral-900 dark:ring-white/5"
+      className="group relative touch-none cursor-grab select-none overflow-hidden rounded-xl border border-black/5 bg-white p-3.5 pl-4 shadow-sm ring-1 ring-black/[0.02] transition-shadow hover:shadow-lg hover:shadow-violet-900/10 active:cursor-grabbing dark:border-white/10 dark:bg-neutral-900 dark:ring-white/5"
     >
+      <span className={`absolute inset-y-0 left-0 w-1 ${ACCENT[task.priority]}`} />
+
       <div className="mb-2 flex items-start justify-between gap-2">
         <div className="flex min-w-0 items-center gap-1.5">
           <GripVertical
             size={16}
             className="shrink-0 text-neutral-300 opacity-0 transition-opacity group-hover:opacity-100 dark:text-neutral-600"
           />
-          <h3 className="truncate text-sm font-semibold text-neutral-900 dark:text-neutral-100">
+          <h3
+            className={`truncate text-sm font-semibold ${
+              isDone
+                ? "text-neutral-400 line-through dark:text-neutral-600"
+                : "text-neutral-900 dark:text-neutral-100"
+            }`}
+          >
             {task.title}
           </h3>
+          {isDone && (
+            <motion.span
+              initial={{ scale: 0, rotate: -30 }}
+              animate={{ scale: 1, rotate: 0 }}
+              transition={{ type: "spring", stiffness: 500, damping: 20 }}
+              className="shrink-0 text-emerald-500"
+            >
+              <CheckCircle2 size={14} />
+            </motion.span>
+          )}
         </div>
         <div className="flex shrink-0 items-center gap-1 opacity-0 transition-opacity group-hover:opacity-100">
-          <button
+          <motion.button
+            whileTap={{ scale: 0.85 }}
+            whileHover={{ scale: 1.1 }}
             onPointerDown={stopDrag}
             onClick={() => onEdit(task)}
             className="rounded-md p-1 text-neutral-400 hover:bg-neutral-100 hover:text-neutral-700 dark:hover:bg-white/10 dark:hover:text-neutral-200"
             aria-label="Sửa"
           >
             <Pencil size={14} />
-          </button>
-          <button
+          </motion.button>
+          <motion.button
+            whileTap={{ scale: 0.85 }}
+            whileHover={{ scale: 1.1 }}
             onPointerDown={stopDrag}
             onClick={() => onDelete(task.id)}
             className="rounded-md p-1 text-neutral-400 hover:bg-rose-50 hover:text-rose-600 dark:hover:bg-rose-500/10 dark:hover:text-rose-400"
             aria-label="Xoá"
           >
             <Trash2 size={14} />
-          </button>
+          </motion.button>
         </div>
       </div>
 

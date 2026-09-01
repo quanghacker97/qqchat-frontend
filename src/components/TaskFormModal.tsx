@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import { X } from "lucide-react";
 import { Task, TaskPriority, TaskStatus, STATUS_LABEL, PRIORITY_LABEL, STATUS_ORDER } from "@/types/task";
+import { SegmentedControl } from "./SegmentedControl";
 
 export interface TaskFormValue {
   title: string;
@@ -73,29 +74,31 @@ export function TaskFormModal({
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           exit={{ opacity: 0 }}
-          className="fixed inset-0 z-50 flex items-end justify-center bg-black/40 backdrop-blur-sm sm:items-center"
+          className="fixed inset-0 z-50 flex items-end justify-center bg-black/50 backdrop-blur-md sm:items-center"
           onClick={onClose}
         >
           <motion.form
-            initial={{ opacity: 0, y: 40, scale: 0.98 }}
+            initial={{ opacity: 0, y: 40, scale: 0.96 }}
             animate={{ opacity: 1, y: 0, scale: 1 }}
-            exit={{ opacity: 0, y: 20, scale: 0.98 }}
+            exit={{ opacity: 0, y: 20, scale: 0.96 }}
             transition={{ type: "spring", stiffness: 380, damping: 32 }}
             onClick={(e) => e.stopPropagation()}
             onSubmit={handleSubmit}
-            className="w-full max-w-md rounded-t-2xl bg-white p-5 shadow-xl dark:bg-neutral-900 sm:rounded-2xl"
+            className="w-full max-w-md rounded-t-2xl border border-white/60 bg-white/95 p-5 shadow-2xl backdrop-blur-xl dark:border-white/10 dark:bg-neutral-900/95 sm:rounded-2xl"
           >
             <div className="mb-4 flex items-center justify-between">
               <h2 className="text-base font-semibold text-neutral-900 dark:text-neutral-100">
                 {initial ? "Sửa task" : "Tạo task mới"}
               </h2>
-              <button
+              <motion.button
+                whileTap={{ scale: 0.85 }}
+                whileHover={{ scale: 1.1, rotate: 90 }}
                 type="button"
                 onClick={onClose}
                 className="rounded-full p-1 text-neutral-400 hover:bg-neutral-100 dark:hover:bg-white/10"
               >
                 <X size={18} />
-              </button>
+              </motion.button>
             </div>
 
             <div className="space-y-3">
@@ -151,56 +154,51 @@ export function TaskFormModal({
                 </div>
               </div>
 
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="mb-1 block text-xs font-medium text-neutral-500 dark:text-neutral-400">
-                    Độ ưu tiên
-                  </label>
-                  <select
-                    value={priority}
-                    onChange={(e) => setPriority(e.target.value as TaskPriority)}
-                    className="w-full rounded-lg border border-neutral-200 bg-white px-3 py-2 text-sm text-neutral-900 outline-none ring-violet-500/30 focus:border-violet-400 focus:ring-2 dark:border-white/10 dark:bg-neutral-800 dark:text-neutral-100"
-                  >
-                    {(Object.keys(PRIORITY_LABEL) as TaskPriority[]).map((p) => (
-                      <option key={p} value={p}>
-                        {PRIORITY_LABEL[p]}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-                <div>
-                  <label className="mb-1 block text-xs font-medium text-neutral-500 dark:text-neutral-400">
-                    Trạng thái
-                  </label>
-                  <select
-                    value={status}
-                    onChange={(e) => setStatus(e.target.value as TaskStatus)}
-                    className="w-full rounded-lg border border-neutral-200 bg-white px-3 py-2 text-sm text-neutral-900 outline-none ring-violet-500/30 focus:border-violet-400 focus:ring-2 dark:border-white/10 dark:bg-neutral-800 dark:text-neutral-100"
-                  >
-                    {STATUS_ORDER.map((s) => (
-                      <option key={s} value={s}>
-                        {STATUS_LABEL[s]}
-                      </option>
-                    ))}
-                  </select>
-                </div>
+              <div>
+                <label className="mb-1 block text-xs font-medium text-neutral-500 dark:text-neutral-400">
+                  Độ ưu tiên
+                </label>
+                <SegmentedControl
+                  name="priority"
+                  value={priority}
+                  onChange={setPriority}
+                  options={(Object.keys(PRIORITY_LABEL) as TaskPriority[]).map((p) => ({
+                    value: p,
+                    label: PRIORITY_LABEL[p],
+                  }))}
+                />
+              </div>
+
+              <div>
+                <label className="mb-1 block text-xs font-medium text-neutral-500 dark:text-neutral-400">
+                  Trạng thái
+                </label>
+                <SegmentedControl
+                  name="status"
+                  value={status}
+                  onChange={setStatus}
+                  options={STATUS_ORDER.map((s) => ({ value: s, label: STATUS_LABEL[s] }))}
+                />
               </div>
             </div>
 
             <div className="mt-5 flex justify-end gap-2">
-              <button
+              <motion.button
+                whileTap={{ scale: 0.96 }}
                 type="button"
                 onClick={onClose}
                 className="rounded-lg px-4 py-2 text-sm font-medium text-neutral-500 hover:bg-neutral-100 dark:hover:bg-white/10"
               >
                 Huỷ
-              </button>
-              <button
+              </motion.button>
+              <motion.button
+                whileTap={{ scale: 0.96 }}
+                whileHover={{ scale: 1.02 }}
                 type="submit"
-                className="rounded-lg bg-violet-600 px-4 py-2 text-sm font-semibold text-white shadow-sm shadow-violet-600/30 hover:bg-violet-700 active:scale-[0.98]"
+                className="rounded-lg bg-gradient-to-r from-violet-600 to-fuchsia-600 px-4 py-2 text-sm font-semibold text-white shadow-lg shadow-violet-600/25 hover:shadow-violet-600/40"
               >
                 {initial ? "Lưu thay đổi" : "Tạo task"}
-              </button>
+              </motion.button>
             </div>
           </motion.form>
         </motion.div>
