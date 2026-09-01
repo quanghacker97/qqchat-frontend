@@ -1,14 +1,15 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useCallback, useMemo, useRef, useState } from "react";
 import { DndContext, DragEndEvent, DragOverlay, DragStartEvent, PointerSensor, useSensor, useSensors } from "@dnd-kit/core";
 import { AnimatePresence, motion } from "framer-motion";
 import { Plus, Search, ListTodo, X, Sparkles } from "lucide-react";
 import { useTasks } from "@/hooks/useTasks";
-import { Task, TaskStatus, STATUS_ORDER } from "@/types/task";
+import { Task, TaskStatus, STATUS_ORDER, STATUS_LABEL } from "@/types/task";
 import { Column } from "./Column";
 import { TaskCard } from "./TaskCard";
 import { TaskFormModal, TaskFormValue } from "./TaskFormModal";
+import { ToastStack, ToastItem, ToastTone } from "./Toast";
 
 export function Board() {
   const { tasks, hydrated, addTask, updateTask, deleteTask, moveTask } = useTasks();
@@ -18,10 +19,24 @@ export function Board() {
   const [editingTask, setEditingTask] = useState<Task | null>(null);
   const [defaultStatus, setDefaultStatus] = useState<TaskStatus>("todo");
   const [activeId, setActiveId] = useState<string | null>(null);
+  const [toasts, setToasts] = useState<ToastItem[]>([]);
+  const [activeMobileIndex, setActiveMobileIndex] = useState(0);
+
+  const scrollRef = useRef<HTMLDivElement | null>(null);
+  const columnRefs = useRef<Map<TaskStatus, HTMLDivElement>>(new Map());
+  const scrollFrame = useRef<number | null>(null);
 
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 6 } })
   );
+
+  const pushToast = useCallback((message: string, tone: ToastTone = "info") => {
+    const id = crypto.randomUUID();
+    setToasts((prev) => [...prev, { id, message, tone }]);
+    setTimeout(() => {
+      setToasts((prev) => prev.filter((t) => t.id !== id));
+    }, 2600);
+  }, []);
 
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
@@ -51,9 +66,28 @@ export function Board() {
     const { active, over } = e;
     if (!over) return;
     const newStatus = over.id as TaskStatus;
-    if (STATUS_ORDER.includes(newStatus)) {
+    const task = tasks.find((t) => t.id === active.id);
+    if (STATUS_ORDER.includes(newStatus) && task && task.status !== newStatus) {
       moveTask(String(active.id), newStatus);
+      pushToast(
+        newStatus === "done" ? `🎉 Hoàn thành: ${task.title}` : `Đã chuyển sang ${STATUS_LABEL[newStatus]}`,
+        newStatus === "done" ? "celebrate" : "success"
+      );
     }
+  }
+
+  function handleQuickMove(id: string, direction: "prev" | "next") {
+    const task = tasks.find((t) => t.id === id);
+    if (!task) return;
+    const idx = STATUS_ORDER.indexOf(task.status);
+    const nextIdx = direction === "next" ? idx + 1 : idx - 1;
+    if (nextIdx < 0 || nextIdx >= STATUS_ORDER.length) return;
+    const newStatus = STATUS_ORDER[nextIdx];
+    moveTask(id, newStatus);
+    pushToast(
+      newStatus === "done" ? `🎉 Hoàn thành: ${task.title}` : `Đã chuyển sang ${STATUS_LABEL[newStatus]}`,
+      newStatus === "done" ? "celebrate" : "success"
+    );
   }
 
   function openCreate(status: TaskStatus) {
@@ -67,13 +101,51 @@ export function Board() {
     setModalOpen(true);
   }
 
+  function handleDelete(id: string) {
+    const task = tasks.find((t) => t.id === id);
+    deleteTask(id);
+    if (task) pushToast(`Đã xoá: ${task.title}`, "danger");
+  }
+
   function handleSubmit(value: TaskFormValue) {
     if (editingTask) {
+      const statusChanged = editingTask.status !== value.status;
       updateTask(editingTask.id, value);
+      pushToast(
+        statusChanged && value.status === "done" ? `🎉 Hoàn thành: ${value.title}` : `Đã lưu: ${value.title}`,
+        statusChanged && value.status === "done" ? "celebrate" : "success"
+      );
     } else {
       addTask(value);
+      pushToast(`Đã tạo: ${value.title}`, "success");
     }
     setModalOpen(false);
+  }
+
+  const handleScroll = useCallback(() => {
+    if (scrollFrame.current) cancelAnimationFrame(scrollFrame.current);
+    scrollFrame.current = requestAnimationFrame(() => {
+      const container = scrollRef.current;
+      if (!container) return;
+      const containerCenter = container.getBoundingClientRect().left + container.clientWidth / 2;
+      let closestIndex = 0;
+      let closestDist = Infinity;
+      STATUS_ORDER.forEach((status, i) => {
+        const el = columnRefs.current.get(status);
+        if (!el) return;
+        const rect = el.getBoundingClientRect();
+        const dist = Math.abs(rect.left + rect.width / 2 - containerCenter);
+        if (dist < closestDist) {
+          closestDist = dist;
+          closestIndex = i;
+        }
+      });
+      setActiveMobileIndex(closestIndex);
+    });
+  }, []);
+
+  function scrollToColumn(status: TaskStatus) {
+    columnRefs.current.get(status)?.scrollIntoView({ behavior: "smooth", inline: "center", block: "nearest" });
   }
 
   const doneCount = tasks.filter((t) => t.status === "done").length;
@@ -180,22 +252,52 @@ export function Board() {
       </motion.header>
 
       <DndContext sensors={sensors} onDragStart={handleDragStart} onDragEnd={handleDragEnd}>
-        <div className="grid flex-1 grid-cols-1 gap-4 sm:grid-cols-3">
+        <div
+          ref={scrollRef}
+          onScroll={handleScroll}
+          className="-mx-4 flex flex-1 snap-x snap-mandatory gap-4 overflow-x-auto px-4 pb-2 sm:mx-0 sm:grid sm:grid-cols-3 sm:overflow-visible sm:px-0 sm:pb-0"
+        >
           {STATUS_ORDER.map((status, i) => (
             <motion.div
               key={status}
+              ref={(el) => {
+                if (el) columnRefs.current.set(status, el);
+                else columnRefs.current.delete(status);
+              }}
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ delay: i * 0.08, type: "spring", stiffness: 260, damping: 26 }}
+              className="w-[86%] shrink-0 snap-center sm:w-auto sm:shrink"
             >
               <Column
                 status={status}
                 tasks={byStatus[status]}
                 onEdit={openEdit}
-                onDelete={deleteTask}
+                onDelete={handleDelete}
                 onAdd={openCreate}
+                onMoveTask={handleQuickMove}
               />
             </motion.div>
+          ))}
+        </div>
+
+        <div className="flex justify-center gap-1.5 sm:hidden">
+          {STATUS_ORDER.map((status, i) => (
+            <button
+              key={status}
+              onClick={() => scrollToColumn(status)}
+              aria-label={`Xem ${STATUS_LABEL[status]}`}
+              className="p-1.5"
+            >
+              <motion.span
+                animate={{
+                  width: activeMobileIndex === i ? 18 : 6,
+                  opacity: activeMobileIndex === i ? 1 : 0.4,
+                }}
+                transition={{ type: "spring", stiffness: 400, damping: 30 }}
+                className="block h-1.5 rounded-full bg-violet-500"
+              />
+            </button>
           ))}
         </div>
 
@@ -218,6 +320,8 @@ export function Board() {
         onClose={() => setModalOpen(false)}
         onSubmit={handleSubmit}
       />
+
+      <ToastStack toasts={toasts} />
     </div>
   );
 }

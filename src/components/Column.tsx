@@ -2,7 +2,7 @@
 
 import { useDroppable } from "@dnd-kit/core";
 import { AnimatePresence, motion } from "framer-motion";
-import { Task, TaskStatus, STATUS_LABEL } from "@/types/task";
+import { Task, TaskStatus, STATUS_LABEL, STATUS_ORDER } from "@/types/task";
 import { TaskCard } from "./TaskCard";
 import { Plus, Inbox, Flame, CheckCircle2 } from "lucide-react";
 import clsx from "clsx";
@@ -31,15 +31,18 @@ export function Column({
   onEdit,
   onDelete,
   onAdd,
+  onMoveTask,
 }: {
   status: TaskStatus;
   tasks: Task[];
   onEdit: (task: Task) => void;
   onDelete: (id: string) => void;
   onAdd: (status: TaskStatus) => void;
+  onMoveTask: (id: string, direction: "prev" | "next") => void;
 }) {
   const { setNodeRef, isOver } = useDroppable({ id: status });
   const EmptyIcon = EMPTY_ICON[status];
+  const statusIndex = STATUS_ORDER.indexOf(status);
 
   return (
     <div className="flex h-full w-full min-w-[280px] flex-col">
@@ -91,7 +94,15 @@ export function Column({
 
         <AnimatePresence mode="popLayout">
           {tasks.map((task) => (
-            <TaskCard key={task.id} task={task} onEdit={onEdit} onDelete={onDelete} />
+            <TaskCard
+              key={task.id}
+              task={task}
+              onEdit={onEdit}
+              onDelete={onDelete}
+              onMove={(direction) => onMoveTask(task.id, direction)}
+              canMovePrev={statusIndex > 0}
+              canMoveNext={statusIndex < STATUS_ORDER.length - 1}
+            />
           ))}
         </AnimatePresence>
 

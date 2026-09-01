@@ -2,7 +2,7 @@
 
 import { useDraggable } from "@dnd-kit/core";
 import { motion } from "framer-motion";
-import { Pencil, Trash2, CalendarDays, GripVertical, CheckCircle2 } from "lucide-react";
+import { Pencil, Trash2, CalendarDays, GripVertical, CheckCircle2, ChevronLeft, ChevronRight } from "lucide-react";
 import { Task, TaskPriority } from "@/types/task";
 import { PriorityBadge } from "./PriorityBadge";
 import { Avatar } from "./Avatar";
@@ -30,10 +30,16 @@ export function TaskCard({
   task,
   onEdit,
   onDelete,
+  onMove,
+  canMovePrev,
+  canMoveNext,
 }: {
   task: Task;
   onEdit: (task: Task) => void;
   onDelete: (id: string) => void;
+  onMove?: (direction: "prev" | "next") => void;
+  canMovePrev?: boolean;
+  canMoveNext?: boolean;
 }) {
   const { attributes, listeners, setNodeRef, transform, isDragging } = useDraggable({
     id: task.id,
@@ -126,6 +132,36 @@ export function TaskCard({
         <PriorityBadge priority={task.priority} />
         {task.assignee && <Avatar name={task.assignee} size={24} />}
       </div>
+
+      {onMove && (canMovePrev || canMoveNext) && (
+        <div className="mt-2.5 flex items-center justify-end gap-1 border-t border-black/5 pt-2.5 dark:border-white/5">
+          <motion.button
+            whileTap={{ scale: 0.85 }}
+            whileHover={canMovePrev ? { scale: 1.1, x: -1 } : undefined}
+            onPointerDown={stopDrag}
+            onClick={() => canMovePrev && onMove("prev")}
+            disabled={!canMovePrev}
+            className="rounded-md p-1 text-neutral-400 enabled:hover:bg-neutral-100 enabled:hover:text-neutral-700 disabled:opacity-25 dark:enabled:hover:bg-white/10 dark:enabled:hover:text-neutral-200"
+            aria-label="Chuyển về trước"
+          >
+            <ChevronLeft size={15} />
+          </motion.button>
+          <span className="text-[10px] font-medium uppercase tracking-wide text-neutral-300 dark:text-neutral-600">
+            Chuyển
+          </span>
+          <motion.button
+            whileTap={{ scale: 0.85 }}
+            whileHover={canMoveNext ? { scale: 1.1, x: 1 } : undefined}
+            onPointerDown={stopDrag}
+            onClick={() => canMoveNext && onMove("next")}
+            disabled={!canMoveNext}
+            className="rounded-md p-1 text-neutral-400 enabled:hover:bg-neutral-100 enabled:hover:text-neutral-700 disabled:opacity-25 dark:enabled:hover:bg-white/10 dark:enabled:hover:text-neutral-200"
+            aria-label="Chuyển tiếp"
+          >
+            <ChevronRight size={15} />
+          </motion.button>
+        </div>
+      )}
 
       {task.dueDate && (
         <div
