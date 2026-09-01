@@ -54,6 +54,15 @@ export function TaskFormModal({
     }
   }, [open, initial, defaultStatus]);
 
+  const fieldContainer = {
+    hidden: {},
+    show: { transition: { staggerChildren: 0.045, delayChildren: 0.05 } },
+  };
+  const fieldItem = {
+    hidden: { opacity: 0, y: 8 },
+    show: { opacity: 1, y: 0, transition: { type: "spring" as const, stiffness: 380, damping: 30 } },
+  };
+
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     if (!title.trim()) return;
@@ -101,8 +110,8 @@ export function TaskFormModal({
               </motion.button>
             </div>
 
-            <div className="space-y-3">
-              <div>
+            <motion.div variants={fieldContainer} initial="hidden" animate="show" className="space-y-3">
+              <motion.div variants={fieldItem}>
                 <label className="mb-1 block text-xs font-medium text-neutral-500 dark:text-neutral-400">
                   Tiêu đề
                 </label>
@@ -114,9 +123,9 @@ export function TaskFormModal({
                   required
                   className="w-full rounded-lg border border-neutral-200 bg-white px-3 py-2 text-sm text-neutral-900 outline-none ring-violet-500/30 focus:border-violet-400 focus:ring-2 dark:border-white/10 dark:bg-neutral-800 dark:text-neutral-100"
                 />
-              </div>
+              </motion.div>
 
-              <div>
+              <motion.div variants={fieldItem}>
                 <label className="mb-1 block text-xs font-medium text-neutral-500 dark:text-neutral-400">
                   Mô tả
                 </label>
@@ -127,9 +136,9 @@ export function TaskFormModal({
                   placeholder="Chi tiết công việc..."
                   className="w-full resize-none rounded-lg border border-neutral-200 bg-white px-3 py-2 text-sm text-neutral-900 outline-none ring-violet-500/30 focus:border-violet-400 focus:ring-2 dark:border-white/10 dark:bg-neutral-800 dark:text-neutral-100"
                 />
-              </div>
+              </motion.div>
 
-              <div className="grid grid-cols-2 gap-3">
+              <motion.div variants={fieldItem} className="grid grid-cols-2 gap-3">
                 <div>
                   <label className="mb-1 block text-xs font-medium text-neutral-500 dark:text-neutral-400">
                     Người phụ trách
@@ -152,9 +161,9 @@ export function TaskFormModal({
                     className="w-full rounded-lg border border-neutral-200 bg-white px-3 py-2 text-sm text-neutral-900 outline-none ring-violet-500/30 focus:border-violet-400 focus:ring-2 dark:border-white/10 dark:bg-neutral-800 dark:text-neutral-100"
                   />
                 </div>
-              </div>
+              </motion.div>
 
-              <div>
+              <motion.div variants={fieldItem}>
                 <label className="mb-1 block text-xs font-medium text-neutral-500 dark:text-neutral-400">
                   Độ ưu tiên
                 </label>
@@ -167,9 +176,9 @@ export function TaskFormModal({
                     label: PRIORITY_LABEL[p],
                   }))}
                 />
-              </div>
+              </motion.div>
 
-              <div>
+              <motion.div variants={fieldItem}>
                 <label className="mb-1 block text-xs font-medium text-neutral-500 dark:text-neutral-400">
                   Trạng thái
                 </label>
@@ -179,8 +188,8 @@ export function TaskFormModal({
                   onChange={setStatus}
                   options={STATUS_ORDER.map((s) => ({ value: s, label: STATUS_LABEL[s] }))}
                 />
-              </div>
-            </div>
+              </motion.div>
+            </motion.div>
 
             <div className="mt-5 flex justify-end gap-2">
               <motion.button

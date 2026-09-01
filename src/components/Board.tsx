@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { DndContext, DragEndEvent, DragOverlay, DragStartEvent, PointerSensor, useSensor, useSensors } from "@dnd-kit/core";
 import { AnimatePresence, motion } from "framer-motion";
 import { Plus, Search, ListTodo, X, Sparkles } from "lucide-react";
@@ -10,6 +10,8 @@ import { Column } from "./Column";
 import { TaskCard } from "./TaskCard";
 import { TaskFormModal, TaskFormValue } from "./TaskFormModal";
 import { ToastStack, ToastItem, ToastTone } from "./Toast";
+import { Confetti } from "./Confetti";
+import { SkeletonBoard } from "./SkeletonBoard";
 
 export function Board() {
   const { tasks, hydrated, addTask, updateTask, deleteTask, moveTask } = useTasks();
@@ -21,6 +23,8 @@ export function Board() {
   const [activeId, setActiveId] = useState<string | null>(null);
   const [toasts, setToasts] = useState<ToastItem[]>([]);
   const [activeMobileIndex, setActiveMobileIndex] = useState(0);
+  const [showConfetti, setShowConfetti] = useState(false);
+  const celebratedRef = useRef(false);
 
   const scrollRef = useRef<HTMLDivElement | null>(null);
   const columnRefs = useRef<Map<TaskStatus, HTMLDivElement>>(new Map());
@@ -151,16 +155,21 @@ export function Board() {
   const doneCount = tasks.filter((t) => t.status === "done").length;
   const progress = tasks.length ? Math.round((doneCount / tasks.length) * 100) : 0;
 
+  useEffect(() => {
+    if (progress === 100 && tasks.length > 0) {
+      if (!celebratedRef.current) {
+        celebratedRef.current = true;
+        setShowConfetti(true);
+        const t = setTimeout(() => setShowConfetti(false), 2200);
+        return () => clearTimeout(t);
+      }
+    } else {
+      celebratedRef.current = false;
+    }
+  }, [progress, tasks.length]);
+
   if (!hydrated) {
-    return (
-      <div className="flex flex-1 items-center justify-center">
-        <motion.div
-          animate={{ rotate: 360 }}
-          transition={{ duration: 1, repeat: Infinity, ease: "linear" }}
-          className="h-6 w-6 rounded-full border-2 border-violet-300 border-t-violet-600"
-        />
-      </div>
-    );
+    return <SkeletonBoard />;
   }
 
   return (
@@ -322,6 +331,7 @@ export function Board() {
       />
 
       <ToastStack toasts={toasts} />
+      <AnimatePresence>{showConfetti && <Confetti />}</AnimatePresence>
     </div>
   );
 }

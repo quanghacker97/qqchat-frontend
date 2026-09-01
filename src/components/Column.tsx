@@ -76,15 +76,27 @@ export function Column({
         </motion.button>
       </div>
 
-      <div
+      <motion.div
         ref={setNodeRef}
+        animate={{ scale: isOver ? 1.015 : 1 }}
+        transition={{ type: "spring", stiffness: 400, damping: 25 }}
         className={clsx(
           "relative flex min-h-[140px] flex-1 flex-col gap-2.5 overflow-hidden rounded-2xl border p-2.5 transition-colors duration-200",
           isOver
-            ? "border-violet-300 bg-violet-50 dark:border-violet-500/40 dark:bg-violet-500/10"
+            ? "border-violet-300 bg-violet-50 shadow-lg shadow-violet-500/10 dark:border-violet-500/40 dark:bg-violet-500/10"
             : "border-black/[0.03] bg-neutral-50/60 dark:border-white/5 dark:bg-white/[0.02]"
         )}
       >
+        <AnimatePresence>
+          {isOver && (
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              className="pointer-events-none absolute inset-2 rounded-xl border-2 border-dashed border-violet-400/50"
+            />
+          )}
+        </AnimatePresence>
         <div
           className={clsx(
             "pointer-events-none absolute -top-10 right-0 h-32 w-32 rounded-full bg-gradient-to-br to-transparent blur-2xl",
@@ -122,7 +134,7 @@ export function Column({
             <span className="text-xs">Kéo task vào đây hoặc bấm để thêm</span>
           </motion.button>
         )}
-      </div>
+      </motion.div>
     </div>
   );
 }
