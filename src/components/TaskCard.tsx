@@ -146,6 +146,33 @@ export function TaskCard({
         </p>
       )}
 
+      {task.images && task.images.length > 0 && (
+        <div className="mb-3 flex gap-1.5">
+          {task.images.slice(0, 3).map((src, i) => {
+            const isLastVisible = i === 2 && task.images.length > 3;
+            return (
+              <motion.button
+                key={src.slice(0, 40) + i}
+                type="button"
+                whileHover={{ scale: 1.05 }}
+                whileTap={{ scale: 0.95 }}
+                onPointerDown={stopDrag}
+                onClick={() => window.open(src, "_blank")}
+                className="relative h-11 w-11 shrink-0 overflow-hidden rounded-lg border border-black/5 dark:border-white/10"
+              >
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img src={src} alt="" className="h-full w-full object-cover" />
+                {isLastVisible && (
+                  <span className="absolute inset-0 flex items-center justify-center bg-black/50 text-[11px] font-semibold text-white">
+                    +{task.images.length - 2}
+                  </span>
+                )}
+              </motion.button>
+            );
+          })}
+        </div>
+      )}
+
       <div className="flex items-center justify-between gap-2">
         <PriorityBadge priority={task.priority} />
         {task.assignee && <Avatar name={task.assignee} size={24} />}

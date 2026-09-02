@@ -14,6 +14,7 @@ const SEED_TASKS: Task[] = [
     priority: "high",
     status: "todo",
     dueDate: null,
+    images: [],
     createdAt: Date.now(),
     updatedAt: Date.now(),
   },
@@ -25,6 +26,7 @@ const SEED_TASKS: Task[] = [
     priority: "high",
     status: "doing",
     dueDate: null,
+    images: [],
     createdAt: Date.now(),
     updatedAt: Date.now(),
   },
@@ -36,6 +38,7 @@ const SEED_TASKS: Task[] = [
     priority: "medium",
     status: "done",
     dueDate: null,
+    images: [],
     createdAt: Date.now(),
     updatedAt: Date.now(),
   },
@@ -47,7 +50,9 @@ function loadTasks(): Task[] {
     const raw = window.localStorage.getItem(STORAGE_KEY);
     if (!raw) return SEED_TASKS;
     const parsed = JSON.parse(raw);
-    if (Array.isArray(parsed)) return parsed;
+    if (Array.isArray(parsed)) {
+      return parsed.map((t) => ({ images: [], ...t }));
+    }
     return SEED_TASKS;
   } catch {
     return SEED_TASKS;
