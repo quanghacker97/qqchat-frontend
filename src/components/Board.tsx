@@ -3,15 +3,23 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { DndContext, DragEndEvent, DragOverlay, DragStartEvent, PointerSensor, useSensor, useSensors } from "@dnd-kit/core";
 import { AnimatePresence, motion } from "framer-motion";
-import { Plus, Search, ListTodo, X, Sparkles } from "lucide-react";
+import { Plus, Search, ListTodo, X, Sparkles, SlidersHorizontal } from "lucide-react";
 import { useTasks } from "@/hooks/useTasks";
-import { Task, TaskStatus, STATUS_ORDER, STATUS_LABEL } from "@/types/task";
+import { Task, TaskPriority, TaskStatus, STATUS_ORDER, STATUS_LABEL, PRIORITY_LABEL } from "@/types/task";
 import { Column } from "./Column";
 import { TaskCard } from "./TaskCard";
 import { TaskFormModal, TaskFormValue } from "./TaskFormModal";
 import { ToastStack, ToastItem, ToastTone } from "./Toast";
 import { Confetti } from "./Confetti";
 import { SkeletonBoard } from "./SkeletonBoard";
+import { Sidebar, SidebarFilters, emptyFilters, taskMatchesFilters } from "./Sidebar";
+
+function toggleInSet<T>(set: Set<T>, value: T): Set<T> {
+  const next = new Set(set);
+  if (next.has(value)) next.delete(value);
+  else next.add(value);
+  return next;
+}
 
 export function Board() {
   const { tasks, hydrated, addTask, updateTask, deleteTask, moveTask } = useTasks();
@@ -24,6 +32,8 @@ export function Board() {
   const [toasts, setToasts] = useState<ToastItem[]>([]);
   const [activeMobileIndex, setActiveMobileIndex] = useState(0);
   const [showConfetti, setShowConfetti] = useState(false);
+  const [filters, setFilters] = useState<SidebarFilters>(emptyFilters());
+  const [mobileFiltersOpen, setMobileFiltersOpen] = useState(false);
   const celebratedRef = useRef(false);
 
   const scrollRef = useRef<HTMLDivElement | null>(null);
@@ -42,16 +52,49 @@ export function Board() {
     }, 2600);
   }, []);
 
+  const toggleStatusFilter = useCallback((s: TaskStatus) => {
+    setFilters((f) => ({ ...f, statuses: toggleInSet(f.statuses, s) }));
+  }, []);
+  const togglePriorityFilter = useCallback((p: TaskPriority) => {
+    setFilters((f) => ({ ...f, priorities: toggleInSet(f.priorities, p) }));
+  }, []);
+  const toggleAssigneeFilter = useCallback((a: string) => {
+    setFilters((f) => ({ ...f, assignees: toggleInSet(f.assignees, a) }));
+  }, []);
+  const clearFilters = useCallback(() => setFilters(emptyFilters()), []);
+
+  const activeFilterCount = filters.statuses.size + filters.priorities.size + filters.assignees.size;
+
+  const activeChips = useMemo(() => {
+    const chips: { key: string; label: string; onRemove: () => void }[] = [];
+    filters.statuses.forEach((s) =>
+      chips.push({ key: `s-${s}`, label: STATUS_LABEL[s], onRemove: () => toggleStatusFilter(s) })
+    );
+    filters.priorities.forEach((p) =>
+      chips.push({ key: `p-${p}`, label: PRIORITY_LABEL[p], onRemove: () => togglePriorityFilter(p) })
+    );
+    filters.assignees.forEach((a) =>
+      chips.push({
+        key: `a-${a}`,
+        label: a === "__unassigned__" ? "Chưa gán" : a,
+        onRemove: () => toggleAssigneeFilter(a),
+      })
+    );
+    return chips;
+  }, [filters, toggleStatusFilter, togglePriorityFilter, toggleAssigneeFilter]);
+
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
-    if (!q) return tasks;
-    return tasks.filter(
-      (t) =>
+    return tasks.filter((t) => {
+      if (!taskMatchesFilters(t, filters)) return false;
+      if (!q) return true;
+      return (
         t.title.toLowerCase().includes(q) ||
         t.description.toLowerCase().includes(q) ||
         t.assignee.toLowerCase().includes(q)
-    );
-  }, [tasks, query]);
+      );
+    });
+  }, [tasks, query, filters]);
 
   const byStatus = useMemo(() => {
     const map: Record<TaskStatus, Task[]> = { todo: [], doing: [], done: [] };
@@ -173,12 +216,12 @@ export function Board() {
   }
 
   return (
-    <div className="mx-auto flex w-full max-w-6xl flex-1 flex-col gap-6 px-4 py-6 sm:px-6">
+    <div className="mx-auto flex w-full max-w-7xl flex-1 flex-col gap-6 px-4 py-6 sm:px-6">
       <motion.header
         initial={{ opacity: 0, y: -16 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ type: "spring", stiffness: 300, damping: 28 }}
-        className="sticky top-3 z-10 flex flex-col gap-4 rounded-3xl border border-white/60 bg-white/70 p-4 shadow-lg shadow-violet-900/5 backdrop-blur-xl dark:border-white/10 dark:bg-neutral-900/60"
+        className="sticky top-3 z-20 flex flex-col gap-4 rounded-3xl border border-white/60 bg-white/70 p-4 shadow-lg shadow-violet-900/5 backdrop-blur-xl dark:border-white/10 dark:bg-neutral-900/60"
       >
         <div className="flex items-center justify-between gap-3">
           <div className="flex items-center gap-2.5">
@@ -195,24 +238,39 @@ export function Board() {
                 Task Board
               </h1>
               <p className="text-xs text-neutral-500 dark:text-neutral-400">
-                {tasks.length} task · {doneCount} hoàn thành · {progress}%
+                {filtered.length}/{tasks.length} task · {doneCount} hoàn thành · {progress}%
               </p>
             </div>
           </div>
-          <motion.button
-            whileTap={{ scale: 0.94 }}
-            whileHover={{ scale: 1.03, y: -1 }}
-            onClick={() => openCreate("todo")}
-            className="group flex items-center gap-1.5 rounded-xl bg-gradient-to-r from-violet-600 to-fuchsia-600 px-3.5 py-2 text-sm font-semibold text-white shadow-lg shadow-violet-600/25 transition-shadow hover:shadow-violet-600/40"
-          >
-            <motion.span
-              whileHover={{ rotate: 90 }}
-              transition={{ type: "spring", stiffness: 400, damping: 15 }}
+          <div className="flex items-center gap-2">
+            <motion.button
+              whileTap={{ scale: 0.9 }}
+              onClick={() => setMobileFiltersOpen(true)}
+              className="relative flex h-9 w-9 items-center justify-center rounded-xl border border-neutral-200 text-neutral-500 hover:bg-neutral-100 dark:border-white/10 dark:text-neutral-400 dark:hover:bg-white/10 sm:hidden"
+              aria-label="Mở bộ lọc"
             >
-              <Plus size={16} />
-            </motion.span>
-            <span className="hidden sm:inline">Thêm task</span>
-          </motion.button>
+              <SlidersHorizontal size={16} />
+              {activeFilterCount > 0 && (
+                <span className="absolute -right-1 -top-1 flex h-4 min-w-4 items-center justify-center rounded-full bg-violet-600 px-1 text-[10px] font-bold text-white">
+                  {activeFilterCount}
+                </span>
+              )}
+            </motion.button>
+            <motion.button
+              whileTap={{ scale: 0.94 }}
+              whileHover={{ scale: 1.03, y: -1 }}
+              onClick={() => openCreate("todo")}
+              className="group flex items-center gap-1.5 rounded-xl bg-gradient-to-r from-violet-600 to-fuchsia-600 px-3.5 py-2 text-sm font-semibold text-white shadow-lg shadow-violet-600/25 transition-shadow hover:shadow-violet-600/40"
+            >
+              <motion.span
+                whileHover={{ rotate: 90 }}
+                transition={{ type: "spring", stiffness: 400, damping: 15 }}
+              >
+                <Plus size={16} />
+              </motion.span>
+              <span className="hidden sm:inline">Thêm task</span>
+            </motion.button>
+          </div>
         </div>
 
         <div className="relative h-2 w-full overflow-hidden rounded-full bg-neutral-100 dark:bg-white/10">
@@ -258,69 +316,155 @@ export function Board() {
             )}
           </AnimatePresence>
         </motion.div>
+
+        <AnimatePresence>
+          {activeChips.length > 0 && (
+            <motion.div
+              initial={{ opacity: 0, height: 0 }}
+              animate={{ opacity: 1, height: "auto" }}
+              exit={{ opacity: 0, height: 0 }}
+              className="flex flex-wrap gap-1.5 overflow-hidden"
+            >
+              {activeChips.map((chip) => (
+                <motion.button
+                  key={chip.key}
+                  layout
+                  initial={{ opacity: 0, scale: 0.8 }}
+                  animate={{ opacity: 1, scale: 1 }}
+                  exit={{ opacity: 0, scale: 0.8 }}
+                  onClick={chip.onRemove}
+                  className="flex items-center gap-1 rounded-full bg-violet-100 px-2.5 py-1 text-xs font-medium text-violet-700 hover:bg-violet-200 dark:bg-violet-500/15 dark:text-violet-300 dark:hover:bg-violet-500/25"
+                >
+                  {chip.label}
+                  <X size={11} />
+                </motion.button>
+              ))}
+              <button
+                onClick={clearFilters}
+                className="text-xs font-medium text-neutral-400 underline-offset-2 hover:text-neutral-600 hover:underline dark:text-neutral-500 dark:hover:text-neutral-300"
+              >
+                Xoá hết
+              </button>
+            </motion.div>
+          )}
+        </AnimatePresence>
       </motion.header>
 
-      <DndContext sensors={sensors} onDragStart={handleDragStart} onDragEnd={handleDragEnd}>
-        <div
-          ref={scrollRef}
-          onScroll={handleScroll}
-          className="-mx-4 flex flex-1 snap-x snap-mandatory gap-4 overflow-x-auto px-4 pb-2 sm:mx-0 sm:grid sm:grid-cols-3 sm:overflow-visible sm:px-0 sm:pb-0"
-        >
-          {STATUS_ORDER.map((status, i) => (
-            <motion.div
-              key={status}
-              ref={(el) => {
-                if (el) columnRefs.current.set(status, el);
-                else columnRefs.current.delete(status);
-              }}
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: i * 0.08, type: "spring", stiffness: 260, damping: 26 }}
-              className="w-[86%] shrink-0 snap-center sm:w-auto sm:shrink"
-            >
-              <Column
-                status={status}
-                tasks={byStatus[status]}
-                onEdit={openEdit}
-                onDelete={handleDelete}
-                onAdd={openCreate}
-                onMoveTask={handleQuickMove}
-              />
-            </motion.div>
-          ))}
-        </div>
+      <div className="flex flex-1 items-start gap-6">
+        <aside className="sticky top-[calc(0.75rem+1px)] hidden max-h-[calc(100vh-2rem)] w-56 shrink-0 overflow-y-auto rounded-2xl border border-white/60 bg-white/70 p-3 shadow-sm backdrop-blur-xl dark:border-white/10 dark:bg-neutral-900/60 sm:block">
+          <Sidebar
+            tasks={tasks}
+            filters={filters}
+            onToggleStatus={toggleStatusFilter}
+            onTogglePriority={togglePriorityFilter}
+            onToggleAssignee={toggleAssigneeFilter}
+            onClear={clearFilters}
+          />
+        </aside>
 
-        <div className="flex justify-center gap-1.5 sm:hidden">
-          {STATUS_ORDER.map((status, i) => (
-            <button
-              key={status}
-              onClick={() => scrollToColumn(status)}
-              aria-label={`Xem ${STATUS_LABEL[status]}`}
-              className="p-1.5"
+        <div className="flex min-w-0 flex-1 flex-col gap-4">
+          <DndContext sensors={sensors} onDragStart={handleDragStart} onDragEnd={handleDragEnd}>
+            <div
+              ref={scrollRef}
+              onScroll={handleScroll}
+              className="-mx-4 flex flex-1 snap-x snap-mandatory gap-4 overflow-x-auto px-4 pb-2 sm:mx-0 sm:grid sm:grid-cols-3 sm:overflow-visible sm:px-0 sm:pb-0"
             >
-              <motion.span
-                animate={{
-                  width: activeMobileIndex === i ? 18 : 6,
-                  opacity: activeMobileIndex === i ? 1 : 0.4,
-                }}
-                transition={{ type: "spring", stiffness: 400, damping: 30 }}
-                className="block h-1.5 rounded-full bg-violet-500"
-              />
-            </button>
-          ))}
-        </div>
+              {STATUS_ORDER.map((status, i) => (
+                <motion.div
+                  key={status}
+                  ref={(el) => {
+                    if (el) columnRefs.current.set(status, el);
+                    else columnRefs.current.delete(status);
+                  }}
+                  initial={{ opacity: 0, y: 20 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ delay: i * 0.08, type: "spring", stiffness: 260, damping: 26 }}
+                  className="w-[86%] shrink-0 snap-center sm:w-auto sm:shrink"
+                >
+                  <Column
+                    status={status}
+                    tasks={byStatus[status]}
+                    onEdit={openEdit}
+                    onDelete={handleDelete}
+                    onAdd={openCreate}
+                    onMoveTask={handleQuickMove}
+                  />
+                </motion.div>
+              ))}
+            </div>
 
-        <DragOverlay>
-          {activeTask ? (
+            <div className="flex justify-center gap-1.5 sm:hidden">
+              {STATUS_ORDER.map((status, i) => (
+                <button
+                  key={status}
+                  onClick={() => scrollToColumn(status)}
+                  aria-label={`Xem ${STATUS_LABEL[status]}`}
+                  className="p-1.5"
+                >
+                  <motion.span
+                    animate={{
+                      width: activeMobileIndex === i ? 18 : 6,
+                      opacity: activeMobileIndex === i ? 1 : 0.4,
+                    }}
+                    transition={{ type: "spring", stiffness: 400, damping: 30 }}
+                    className="block h-1.5 rounded-full bg-violet-500"
+                  />
+                </button>
+              ))}
+            </div>
+
+            <DragOverlay>
+              {activeTask ? (
+                <motion.div
+                  initial={{ scale: 1.03, rotate: 3 }}
+                  className="cursor-grabbing drop-shadow-2xl"
+                >
+                  <TaskCard task={activeTask} onEdit={() => {}} onDelete={() => {}} />
+                </motion.div>
+              ) : null}
+            </DragOverlay>
+          </DndContext>
+        </div>
+      </div>
+
+      <AnimatePresence>
+        {mobileFiltersOpen && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-50 flex bg-black/50 backdrop-blur-sm sm:hidden"
+            onClick={() => setMobileFiltersOpen(false)}
+          >
             <motion.div
-              initial={{ scale: 1.03, rotate: 3 }}
-              className="cursor-grabbing drop-shadow-2xl"
+              initial={{ x: -20, opacity: 0 }}
+              animate={{ x: 0, opacity: 1 }}
+              exit={{ x: -20, opacity: 0 }}
+              transition={{ type: "spring", stiffness: 380, damping: 34 }}
+              onClick={(e) => e.stopPropagation()}
+              className="relative h-full w-72 max-w-[85%] overflow-y-auto bg-white p-4 shadow-2xl dark:bg-neutral-900"
             >
-              <TaskCard task={activeTask} onEdit={() => {}} onDelete={() => {}} />
+              <button
+                onClick={() => setMobileFiltersOpen(false)}
+                className="absolute right-3 top-3 rounded-full p-1 text-neutral-400 hover:bg-neutral-100 dark:hover:bg-white/10"
+                aria-label="Đóng bộ lọc"
+              >
+                <X size={18} />
+              </button>
+              <div className="pt-6">
+                <Sidebar
+                  tasks={tasks}
+                  filters={filters}
+                  onToggleStatus={toggleStatusFilter}
+                  onTogglePriority={togglePriorityFilter}
+                  onToggleAssignee={toggleAssigneeFilter}
+                  onClear={clearFilters}
+                />
+              </div>
             </motion.div>
-          ) : null}
-        </DragOverlay>
-      </DndContext>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
       <TaskFormModal
         open={modalOpen}
