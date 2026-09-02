@@ -12,7 +12,7 @@ import { TaskFormModal, TaskFormValue } from "./TaskFormModal";
 import { ToastStack, ToastItem, ToastTone } from "./Toast";
 import { Confetti } from "./Confetti";
 import { SkeletonBoard } from "./SkeletonBoard";
-import { Sidebar, SidebarFilters, emptyFilters, taskMatchesFilters } from "./Sidebar";
+import { Sidebar, SidebarFilters, DateFilterKey, DATE_FILTER_LABEL, emptyFilters, taskMatchesFilters } from "./Sidebar";
 
 function toggleInSet<T>(set: Set<T>, value: T): Set<T> {
   const next = new Set(set);
@@ -61,9 +61,13 @@ export function Board() {
   const toggleAssigneeFilter = useCallback((a: string) => {
     setFilters((f) => ({ ...f, assignees: toggleInSet(f.assignees, a) }));
   }, []);
+  const setDateFilter = useCallback((d: DateFilterKey) => {
+    setFilters((f) => ({ ...f, dateFilter: f.dateFilter === d ? null : d }));
+  }, []);
   const clearFilters = useCallback(() => setFilters(emptyFilters()), []);
 
-  const activeFilterCount = filters.statuses.size + filters.priorities.size + filters.assignees.size;
+  const activeFilterCount =
+    filters.statuses.size + filters.priorities.size + filters.assignees.size + (filters.dateFilter ? 1 : 0);
 
   const activeChips = useMemo(() => {
     const chips: { key: string; label: string; onRemove: () => void }[] = [];
@@ -80,8 +84,15 @@ export function Board() {
         onRemove: () => toggleAssigneeFilter(a),
       })
     );
+    if (filters.dateFilter) {
+      chips.push({
+        key: `d-${filters.dateFilter}`,
+        label: DATE_FILTER_LABEL[filters.dateFilter],
+        onRemove: () => setDateFilter(filters.dateFilter as DateFilterKey),
+      });
+    }
     return chips;
-  }, [filters, toggleStatusFilter, togglePriorityFilter, toggleAssigneeFilter]);
+  }, [filters, toggleStatusFilter, togglePriorityFilter, toggleAssigneeFilter, setDateFilter]);
 
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
@@ -358,6 +369,7 @@ export function Board() {
             onToggleStatus={toggleStatusFilter}
             onTogglePriority={togglePriorityFilter}
             onToggleAssignee={toggleAssigneeFilter}
+            onSetDateFilter={setDateFilter}
             onClear={clearFilters}
           />
         </aside>
@@ -458,6 +470,7 @@ export function Board() {
                   onToggleStatus={toggleStatusFilter}
                   onTogglePriority={togglePriorityFilter}
                   onToggleAssignee={toggleAssigneeFilter}
+                  onSetDateFilter={setDateFilter}
                   onClear={clearFilters}
                 />
               </div>

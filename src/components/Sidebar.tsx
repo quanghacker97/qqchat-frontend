@@ -2,25 +2,50 @@
 
 import { useMemo, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
-import { ChevronRight, ListTree, ListChecks, X } from "lucide-react";
+import { ChevronRight, ListTree, ListChecks, CalendarClock, X } from "lucide-react";
 import clsx from "clsx";
 import { Task, TaskPriority, TaskStatus, STATUS_ORDER, STATUS_LABEL, PRIORITY_LABEL } from "@/types/task";
 import { Avatar } from "./Avatar";
+
+export type DateFilterKey = "overdue" | "today" | "week" | "none";
+
+export const DATE_FILTER_LABEL: Record<DateFilterKey, string> = {
+  overdue: "Quá hạn",
+  today: "Hôm nay",
+  week: "7 ngày tới",
+  none: "Không có hạn",
+};
 
 export interface SidebarFilters {
   statuses: Set<TaskStatus>;
   priorities: Set<TaskPriority>;
   assignees: Set<string>;
+  dateFilter: DateFilterKey | null;
 }
 
 export function emptyFilters(): SidebarFilters {
-  return { statuses: new Set(), priorities: new Set(), assignees: new Set() };
+  return { statuses: new Set(), priorities: new Set(), assignees: new Set(), dateFilter: null };
+}
+
+function matchesDateFilter(task: Task, key: DateFilterKey): boolean {
+  if (key === "none") return !task.dueDate;
+  if (!task.dueDate) return false;
+  const due = new Date(task.dueDate);
+  due.setHours(0, 0, 0, 0);
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  const diffDays = Math.round((due.getTime() - today.getTime()) / 86400000);
+  if (key === "overdue") return diffDays < 0 && task.status !== "done";
+  if (key === "today") return diffDays === 0;
+  if (key === "week") return diffDays >= 0 && diffDays <= 7;
+  return true;
 }
 
 export function taskMatchesFilters(task: Task, filters: SidebarFilters): boolean {
   if (filters.statuses.size > 0 && !filters.statuses.has(task.status)) return false;
   if (filters.priorities.size > 0 && !filters.priorities.has(task.priority)) return false;
   if (filters.assignees.size > 0 && !filters.assignees.has(task.assignee || "__unassigned__")) return false;
+  if (filters.dateFilter && !matchesDateFilter(task, filters.dateFilter)) return false;
   return true;
 }
 
@@ -86,6 +111,7 @@ function TreeLeaf({
   avatar,
   label,
   count,
+  radio,
 }: {
   active: boolean;
   onClick: () => void;
@@ -93,6 +119,7 @@ function TreeLeaf({
   avatar?: string;
   label: string;
   count: number;
+  radio?: boolean;
 }) {
   return (
     <button
@@ -106,21 +133,31 @@ function TreeLeaf({
     >
       <span
         className={clsx(
-          "flex h-4 w-4 shrink-0 items-center justify-center rounded border transition-colors",
+          "flex h-4 w-4 shrink-0 items-center justify-center border transition-colors",
+          radio ? "rounded-full" : "rounded",
           active
             ? "border-violet-500 bg-violet-500"
             : "border-neutral-300 bg-transparent group-hover:border-neutral-400 dark:border-neutral-600"
         )}
       >
-        <motion.svg
-          viewBox="0 0 12 12"
-          className="h-2.5 w-2.5 text-white"
-          initial={false}
-          animate={{ scale: active ? 1 : 0, opacity: active ? 1 : 0 }}
-          transition={{ type: "spring", stiffness: 500, damping: 25 }}
-        >
-          <path d="M2 6l2.5 2.5L10 3" stroke="currentColor" strokeWidth="1.8" fill="none" strokeLinecap="round" strokeLinejoin="round" />
-        </motion.svg>
+        {radio ? (
+          <motion.span
+            initial={false}
+            animate={{ scale: active ? 1 : 0 }}
+            transition={{ type: "spring", stiffness: 500, damping: 25 }}
+            className="h-1.5 w-1.5 rounded-full bg-white"
+          />
+        ) : (
+          <motion.svg
+            viewBox="0 0 12 12"
+            className="h-2.5 w-2.5 text-white"
+            initial={false}
+            animate={{ scale: active ? 1 : 0, opacity: active ? 1 : 0 }}
+            transition={{ type: "spring", stiffness: 500, damping: 25 }}
+          >
+            <path d="M2 6l2.5 2.5L10 3" stroke="currentColor" strokeWidth="1.8" fill="none" strokeLinecap="round" strokeLinejoin="round" />
+          </motion.svg>
+        )}
       </span>
       {dot && <span className={clsx("h-2 w-2 shrink-0 rounded-full", dot)} />}
       {avatar && <Avatar name={avatar} size={18} />}
@@ -136,6 +173,7 @@ export function Sidebar({
   onToggleStatus,
   onTogglePriority,
   onToggleAssignee,
+  onSetDateFilter,
   onClear,
 }: {
   tasks: Task[];
@@ -143,6 +181,7 @@ export function Sidebar({
   onToggleStatus: (s: TaskStatus) => void;
   onTogglePriority: (p: TaskPriority) => void;
   onToggleAssignee: (a: string) => void;
+  onSetDateFilter: (d: DateFilterKey) => void;
   onClear: () => void;
 }) {
   const statusCounts = useMemo(() => {
@@ -166,7 +205,18 @@ export function Sidebar({
     return Array.from(map.entries()).sort((a, b) => b[1] - a[1]);
   }, [tasks]);
 
-  const activeCount = filters.statuses.size + filters.priorities.size + filters.assignees.size;
+  const dateCounts = useMemo(() => {
+    const map: Record<DateFilterKey, number> = { overdue: 0, today: 0, week: 0, none: 0 };
+    for (const t of tasks) {
+      (Object.keys(map) as DateFilterKey[]).forEach((key) => {
+        if (matchesDateFilter(t, key)) map[key]++;
+      });
+    }
+    return map;
+  }, [tasks]);
+
+  const activeCount =
+    filters.statuses.size + filters.priorities.size + filters.assignees.size + (filters.dateFilter ? 1 : 0);
 
   return (
     <div className="flex h-full flex-col gap-1">
@@ -229,6 +279,19 @@ export function Sidebar({
             avatar={name === "__unassigned__" ? "?" : name}
             label={name === "__unassigned__" ? "Chưa gán" : name}
             count={count}
+          />
+        ))}
+      </TreeGroup>
+
+      <TreeGroup label="Hạn chót" icon={<CalendarClock size={13} />}>
+        {(Object.keys(DATE_FILTER_LABEL) as DateFilterKey[]).map((key) => (
+          <TreeLeaf
+            key={key}
+            radio
+            active={filters.dateFilter === key}
+            onClick={() => onSetDateFilter(key)}
+            label={DATE_FILTER_LABEL[key]}
+            count={dateCounts[key]}
           />
         ))}
       </TreeGroup>
